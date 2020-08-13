@@ -1,0 +1,51 @@
+{
+  "name": "altern-map",
+  "version": "0.0.1-SNAPSHOT-3",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "sideEffects": false,
+  "scripts": {
+    "test": "mocha -r ts-node/register test/**/*.ts",
+    "test:js": "mocha dist/cjs/test/**/*.js",
+    "dist": "yarn run dist:clean && yarn run dist:build && yarn run dist:copy",
+    "dist:build": "yarn run dist:build:cjs && yarn run dist:build:esm && yarn run dist:build:bundle",
+    "dist:build:bundle": "webpack --config webpack.config.js && webpack --config webpack.config.js --env.production",
+    "dist:build:cjs": "tsc -p tsconfig-dist-cjs.json",
+    "dist:build:cjs:watch": "tsc -w -p tsconfig-dist-cjs.json",
+    "dist:build:esm": "tsc -p tsconfig-dist-esm.json",
+    "dist:clean": "rimraf dist && rimraf bundles/altern-map.* && mkdirp bundles",
+    "dist:copy": "cpy bundles/altern-map.* dist/bundles"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/miginmrs/altern-map.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/miginmrs/altern-map/issues"
+  },
+  "homepage": "https://github.com/miginmrs/altern-map#readme",
+  "directories": {
+    "lib": "lib"
+  },
+  "peerDependencies": {
+    "rxjs": "^6.0.0"
+  },
+  "unpkg": "./bundles/altern-map.min.umd.js",
+  "description": "",
+  "devDependencies": {
+    "@types/chai": "^4.2.12",
+    "@types/mocha": "^8.0.2",
+    "chai": "^4.2.0",
+    "cpy-cli": "^3.1.1",
+    "mocha": "^8.1.1",
+    "rimraf": "^3.0.2",
+    "rxjs": "^6.6.0",
+    "ts-loader": "^8.0.1",
+    "typescript": "^3.9.7",
+    "webpack": "^4.43.0",
+    "webpack-cli": "^3.3.12",
+    "webpack-rxjs-externals": "^2.0.0"
+  }
+}
