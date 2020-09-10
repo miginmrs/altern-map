@@ -1,0 +1,36 @@
+{
+  "name": "altern-map",
+  "version": "0.0.1",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "source": "./source",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/miginmrs/altern-map.git"
+  },
+  "author": "miginmrs",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/miginmrs/altern-map/issues"
+  },
+  "homepage": "https://github.com/miginmrs/altern-map#readme",
+  "directories": {
+    "lib": "lib"
+  },
+  "peerDependencies": {
+    "rxjs": ">=6.0.0",
+    "rxjs-umd": "miginmrs/rxjs-umd#builds"
+  },
+  "unpkg": "./bundles/altern-map.min.umd.js",
+  "description": "SwitchMap alternative suitable for shared observables",
+  "dependencies": {},
+  "keywords": [
+    "rxjs",
+    "switchMap",
+    "shared",
+    "alternMap",
+    "switch",
+    "observable"
+  ]
+}
