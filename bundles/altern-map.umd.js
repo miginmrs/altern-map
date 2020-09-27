@@ -1,13 +1,13 @@
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
-		module.exports = factory(require("rxjs"), require("rxjs/internal/InnerSubscriber"), require("rxjs/internal/OuterSubscriber"), require("rxjs/internal/util/subscribeToResult"), require("rxjs/operators"));
+		module.exports = factory(require("rxjs/internal/InnerSubscriber"), require("rxjs/internal/OuterSubscriber"), require("rxjs/internal/util/subscribeToResult"));
 	else if(typeof define === 'function' && define.amd)
-		define(["rxjs", "rxjs/internal/InnerSubscriber", "rxjs/internal/OuterSubscriber", "rxjs/internal/util/subscribeToResult", "rxjs/operators"], factory);
+		define(["rxjs/internal/InnerSubscriber", "rxjs/internal/OuterSubscriber", "rxjs/internal/util/subscribeToResult"], factory);
 	else if(typeof exports === 'object')
-		exports["alternMap"] = factory(require("rxjs"), require("rxjs/internal/InnerSubscriber"), require("rxjs/internal/OuterSubscriber"), require("rxjs/internal/util/subscribeToResult"), require("rxjs/operators"));
+		exports["alternMap"] = factory(require("rxjs/internal/InnerSubscriber"), require("rxjs/internal/OuterSubscriber"), require("rxjs/internal/util/subscribeToResult"));
 	else
-		root["alternMap"] = factory(root["rxjs"], root["rxjs"]["internal"]["InnerSubscriber"], root["rxjs"]["internal"]["OuterSubscriber"], root["rxjs"]["internal"]["util"]["subscribeToResult"], root["rxjs"]["operators"]);
-})(window, function(__WEBPACK_EXTERNAL_MODULE_rxjs__, __WEBPACK_EXTERNAL_MODULE_rxjs_internal_InnerSubscriber__, __WEBPACK_EXTERNAL_MODULE_rxjs_internal_OuterSubscriber__, __WEBPACK_EXTERNAL_MODULE_rxjs_internal_util_subscribeToResult__, __WEBPACK_EXTERNAL_MODULE_rxjs_operators__) {
+		root["alternMap"] = factory(root["rxjs"]["internal"]["InnerSubscriber"], root["rxjs"]["internal"]["OuterSubscriber"], root["rxjs"]["internal"]["util"]["subscribeToResult"]);
+})(window, function(__WEBPACK_EXTERNAL_MODULE_rxjs_internal_InnerSubscriber__, __WEBPACK_EXTERNAL_MODULE_rxjs_internal_OuterSubscriber__, __WEBPACK_EXTERNAL_MODULE_rxjs_internal_util_subscribeToResult__) {
 return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
 /******/ 	var installedModules = {};
@@ -107,16 +107,18 @@ return /******/ (function(modules) { // webpackBootstrap
 
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.alternMap = void 0;
-const rxjs_1 = __webpack_require__(/*! rxjs */ "rxjs");
-const operators_1 = __webpack_require__(/*! rxjs/operators */ "rxjs/operators");
 const OuterSubscriber_1 = __webpack_require__(/*! rxjs/internal/OuterSubscriber */ "rxjs/internal/OuterSubscriber");
 const InnerSubscriber_1 = __webpack_require__(/*! rxjs/internal/InnerSubscriber */ "rxjs/internal/InnerSubscriber");
 const subscribeToResult_1 = __webpack_require__(/*! rxjs/internal/util/subscribeToResult */ "rxjs/internal/util/subscribeToResult");
-function alternMap(project, options, resultSelector) {
-    if (typeof resultSelector === 'function') {
-        return (source) => source.pipe(alternMap((a, i) => rxjs_1.from(project(a, i)).pipe(operators_1.map((b, ii) => resultSelector(a, b, i, ii))), options));
-    }
-    return (source) => source.lift(new AlternMapOperator(project, options || {}));
+function alternMap(...args) {
+    const [project, options] = args;
+    const op = (source) => source.lift(new AlternMapOperator(project, options || {}));
+    if (!args[2])
+        return op;
+    const p = args[0];
+    return (source) => Object.defineProperty(op(source), 'value', {
+        get: () => p(source.value, -1).value
+    });
 }
 exports.alternMap = alternMap;
 class AlternMapOperator {
@@ -203,22 +205,11 @@ var __createBinding = (this && this.__createBinding) || (Object.create ? (functi
     o[k2] = m[k];
 }));
 var __exportStar = (this && this.__exportStar) || function(m, exports) {
-    for (var p in m) if (p !== "default" && !exports.hasOwnProperty(p)) __createBinding(exports, m, p);
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(__webpack_require__(/*! ./altern-map */ "./source/altern-map.ts"), exports);
 
-
-/***/ }),
-
-/***/ "rxjs":
-/*!************************************************************************************!*\
-  !*** external {"root":["rxjs"],"commonjs":"rxjs","commonjs2":"rxjs","amd":"rxjs"} ***!
-  \************************************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-module.exports = __WEBPACK_EXTERNAL_MODULE_rxjs__;
 
 /***/ }),
 
@@ -252,17 +243,6 @@ module.exports = __WEBPACK_EXTERNAL_MODULE_rxjs_internal_OuterSubscriber__;
 /***/ (function(module, exports) {
 
 module.exports = __WEBPACK_EXTERNAL_MODULE_rxjs_internal_util_subscribeToResult__;
-
-/***/ }),
-
-/***/ "rxjs/operators":
-/*!******************************************************************************************************************************!*\
-  !*** external {"root":["rxjs","operators"],"commonjs":"rxjs/operators","commonjs2":"rxjs/operators","amd":"rxjs/operators"} ***!
-  \******************************************************************************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-module.exports = __WEBPACK_EXTERNAL_MODULE_rxjs_operators__;
 
 /***/ })
 

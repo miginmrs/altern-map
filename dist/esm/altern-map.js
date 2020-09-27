@@ -1,13 +1,15 @@
-import { from } from "rxjs";
-import { map } from "rxjs/operators";
-import { OuterSubscriber } from "rxjs/internal/OuterSubscriber";
-import { InnerSubscriber } from "rxjs/internal/InnerSubscriber";
-import { subscribeToResult } from "rxjs/internal/util/subscribeToResult";
-export function alternMap(project, options, resultSelector) {
-    if (typeof resultSelector === 'function') {
-        return (source) => source.pipe(alternMap((a, i) => from(project(a, i)).pipe(map((b, ii) => resultSelector(a, b, i, ii))), options));
-    }
-    return (source) => source.lift(new AlternMapOperator(project, options || {}));
+import { OuterSubscriber } from 'rxjs/internal/OuterSubscriber';
+import { InnerSubscriber } from 'rxjs/internal/InnerSubscriber';
+import { subscribeToResult } from 'rxjs/internal/util/subscribeToResult';
+export function alternMap(...args) {
+    const [project, options] = args;
+    const op = (source) => source.lift(new AlternMapOperator(project, options || {}));
+    if (!args[2])
+        return op;
+    const p = args[0];
+    return (source) => Object.defineProperty(op(source), 'value', {
+        get: () => p(source.value, -1).value
+    });
 }
 class AlternMapOperator {
     constructor(project, options) {

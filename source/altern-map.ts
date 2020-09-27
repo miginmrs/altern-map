@@ -1,18 +1,17 @@
-import { ObservableInput, OperatorFunction, ObservedValueOf, from, Observable, Operator, Subscriber, Subscription } from "rxjs";
-import { map } from "rxjs/operators";
-import { OuterSubscriber } from "rxjs/internal/OuterSubscriber";
-import { InnerSubscriber } from "rxjs/internal/InnerSubscriber";
-import { subscribeToResult } from "rxjs/internal/util/subscribeToResult";
+import { ObservableInput, OperatorFunction, ObservedValueOf, Observable, Operator, Subscriber, Subscription, UnaryFunction } from 'rxjs';
+import { OuterSubscriber } from 'rxjs/internal/OuterSubscriber';
+import { InnerSubscriber } from 'rxjs/internal/InnerSubscriber';
+import { subscribeToResult } from 'rxjs/internal/util/subscribeToResult';
 
+
+type ValuedObservable<T> = Observable<T> & { readonly value: T; };
+type ValuedOperator<T, R> = { (o: ValuedObservable<T>): ValuedObservable<R> };
 
 type AlternMapOptions = { completeWithInner?: boolean, completeWithSource?: boolean };
 
 /* tslint:disable:max-line-length */
-export function alternMap<T, O extends ObservableInput<any>>(project: (value: T, index: number) => O, options?: AlternMapOptions): OperatorFunction<T, ObservedValueOf<O>>;
-/** @deprecated resultSelector is no longer supported, use inner map instead */
-export function alternMap<T, O extends ObservableInput<any>>(project: (value: T, index: number) => O, options: AlternMapOptions, resultSelector: undefined): OperatorFunction<T, ObservedValueOf<O>>;
-/** @deprecated resultSelector is no longer supported, use inner map instead */
-export function alternMap<T, R, O extends ObservableInput<any>>(project: (value: T, index: number) => O, options: AlternMapOptions, resultSelector: (outerValue: T, innerValue: ObservedValueOf<O>, outerIndex: number, innerIndex: number) => R): OperatorFunction<T, R>;
+export function alternMap<T, R>(project: (value: T, index: number) => ObservableInput<R>, options?: AlternMapOptions): OperatorFunction<T, R>;
+export function alternMap<T, R>(project: (value: T, index: number) => ValuedObservable<R>, options: AlternMapOptions, valued: true): ValuedOperator<T, R>;
 /* tslint:enable:max-line-length */
 
 /**
@@ -22,7 +21,7 @@ export function alternMap<T, R, O extends ObservableInput<any>>(project: (value:
  * @see {@link switchMap}
  * @see {@link mergeMap}
  *
- * @param {function(value: T, ?index: number): ObservableInput} project A function
+ * @param {function(value: T, ?index: number): ObservableInput} p A function
  * that, when applied to an item emitted by the source Observable, returns an
  * Observable.
  * @return {Observable} An Observable that emits the result of applying the
@@ -32,19 +31,17 @@ export function alternMap<T, R, O extends ObservableInput<any>>(project: (value:
  * @method alternMap
  * @owner Observable
  */
-export function alternMap<T, R, O extends ObservableInput<any>>(
-  project: (value: T, index: number) => O,
-  options?: AlternMapOptions,
-  resultSelector?: (outerValue: T, innerValue: ObservedValueOf<O>, outerIndex: number, innerIndex: number) => R,
-): OperatorFunction<T, ObservedValueOf<O> | R> {
-  if (typeof resultSelector === 'function') {
-    return (source: Observable<T>) => source.pipe(
-      alternMap((a, i) => from(project(a, i)).pipe(
-        map((b, ii) => resultSelector(a, b, i, ii))
-      ), options)
-    );
-  }
-  return (source: Observable<T>) => source.lift(new AlternMapOperator(project, options || {}));
+export function alternMap<T, R>(
+  ...args: [(value: T, index: number) => ObservableInput<R>, AlternMapOptions?, undefined?] |
+  [(value: T, index: number) => ValuedObservable<R>, AlternMapOptions, true]
+): OperatorFunction<T, R> | ValuedOperator<T, R> {
+  const [project, options] = args
+  const op = (source: Observable<T>) => source.lift(new AlternMapOperator(project, options || {}));
+  if (!args[2]) return op;
+  const p = args[0];
+  return (source: ValuedObservable<T>) => Object.defineProperty(op(source), 'value', {
+    get: () => p(source.value, -1).value
+  });
 }
 
 class AlternMapOperator<T, R> implements Operator<T, R> {

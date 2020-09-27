@@ -1,16 +1,18 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.alternMap = void 0;
-const rxjs_1 = require("rxjs");
-const operators_1 = require("rxjs/operators");
 const OuterSubscriber_1 = require("rxjs/internal/OuterSubscriber");
 const InnerSubscriber_1 = require("rxjs/internal/InnerSubscriber");
 const subscribeToResult_1 = require("rxjs/internal/util/subscribeToResult");
-function alternMap(project, options, resultSelector) {
-    if (typeof resultSelector === 'function') {
-        return (source) => source.pipe(alternMap((a, i) => rxjs_1.from(project(a, i)).pipe(operators_1.map((b, ii) => resultSelector(a, b, i, ii))), options));
-    }
-    return (source) => source.lift(new AlternMapOperator(project, options || {}));
+function alternMap(...args) {
+    const [project, options] = args;
+    const op = (source) => source.lift(new AlternMapOperator(project, options || {}));
+    if (!args[2])
+        return op;
+    const p = args[0];
+    return (source) => Object.defineProperty(op(source), 'value', {
+        get: () => p(source.value, -1).value
+    });
 }
 exports.alternMap = alternMap;
 class AlternMapOperator {
