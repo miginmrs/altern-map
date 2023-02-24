@@ -1,5 +1,4 @@
 import { expect } from 'chai';
-import { of, Observable } from 'rxjs';
 import { TestScheduler } from 'rxjs/testing';
 import { share, switchMap, tap } from 'rxjs/operators';
 import { alternMap } from '../source/index';
