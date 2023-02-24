@@ -1,81 +1,29 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.alternMap = void 0;
-const OuterSubscriber_1 = require("rxjs/internal/OuterSubscriber");
-const InnerSubscriber_1 = require("rxjs/internal/InnerSubscriber");
-const subscribeToResult_1 = require("rxjs/internal/util/subscribeToResult");
-function alternMap(...args) {
-    const [project, options] = args;
-    const op = (source) => source.lift(new AlternMapOperator(project, options || {}));
-    if (!args[2])
-        return op;
-    const p = args[0];
-    return (source) => Object.defineProperty(op(source), 'value', {
-        get: () => p(source.value, -1).value
+const innerFrom_1 = require("rxjs/internal/observable/innerFrom");
+const lift_1 = require("rxjs/internal/util/lift");
+const OperatorSubscriber_1 = require("rxjs/internal/operators/OperatorSubscriber");
+function alternMap(project, resultSelector) {
+    return (0, lift_1.operate)((source, subscriber) => {
+        let innerSubscriber = null;
+        let index = 0;
+        let isComplete = false;
+        const checkComplete = () => isComplete && !innerSubscriber && subscriber.complete();
+        source.subscribe((0, OperatorSubscriber_1.createOperatorSubscriber)(subscriber, (value) => {
+            const subs = innerSubscriber;
+            let innerIndex = 0;
+            const outerIndex = index++;
+            (0, innerFrom_1.innerFrom)(project(value, outerIndex)).subscribe((innerSubscriber = (0, OperatorSubscriber_1.createOperatorSubscriber)(subscriber, (innerValue) => subscriber.next(resultSelector ? resultSelector(value, innerValue, outerIndex, innerIndex++) : innerValue), () => {
+                innerSubscriber = null;
+                checkComplete();
+            })));
+            subs?.unsubscribe();
+        }, () => {
+            isComplete = true;
+            checkComplete();
+        }));
     });
 }
 exports.alternMap = alternMap;
-class AlternMapOperator {
-    constructor(project, options) {
-        this.project = project;
-        this.options = options;
-    }
-    call(subscriber, source) {
-        return source.subscribe(new AlternMapSubscriber(subscriber, this.project, this.options));
-    }
-}
-class AlternMapSubscriber extends OuterSubscriber_1.OuterSubscriber {
-    constructor(destination, project, options) {
-        super(destination);
-        this.project = project;
-        this.options = options;
-        this.index = 0;
-    }
-    _next(value) {
-        let result;
-        const index = this.index++;
-        try {
-            result = this.project(value, index);
-        }
-        catch (error) {
-            this.destination.error(error);
-            return;
-        }
-        this._innerSub(result, value, index);
-    }
-    _innerSub(result, value, index) {
-        const innerSubscription = this.innerSubscription;
-        const innerSubscriber = new InnerSubscriber_1.InnerSubscriber(this, value, index);
-        const destination = this.destination;
-        destination.add(innerSubscriber);
-        this.innerSubscription = subscribeToResult_1.subscribeToResult(this, result, undefined, undefined, innerSubscriber);
-        if (this.innerSubscription !== innerSubscriber) {
-            destination.add(this.innerSubscription);
-        }
-        if (innerSubscription) {
-            innerSubscription.unsubscribe();
-        }
-    }
-    _complete() {
-        const { innerSubscription } = this;
-        if (!innerSubscription || innerSubscription.closed || this.options.completeWithSource) {
-            super._complete();
-        }
-        this.unsubscribe();
-    }
-    _unsubscribe() {
-        this.innerSubscription = null;
-    }
-    notifyComplete(innerSub) {
-        const destination = this.destination;
-        destination.remove(innerSub);
-        this.innerSubscription = null;
-        if (this.isStopped || this.options.completeWithInner) {
-            super._complete();
-        }
-    }
-    notifyNext(outerValue, innerValue, outerIndex, innerIndex, innerSub) {
-        this.destination.next(innerValue);
-    }
-}
 //# sourceMappingURL=altern-map.js.map

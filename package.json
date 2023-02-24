@@ -1,6 +1,6 @@
 {
   "name": "altern-map",
-  "version": "0.0.2",
+  "version": "7.0.0",
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.js",
   "source": "./source",
