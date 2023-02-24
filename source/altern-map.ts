@@ -1,17 +1,24 @@
-import { ObservableInput, OperatorFunction, ObservedValueOf, Observable, Operator, Subscriber, Subscription, UnaryFunction } from 'rxjs';
-import { OuterSubscriber } from 'rxjs/internal/OuterSubscriber';
-import { InnerSubscriber } from 'rxjs/internal/InnerSubscriber';
-import { subscribeToResult } from 'rxjs/internal/util/subscribeToResult';
-
-
-type ValuedObservable<T> = Observable<T> & { readonly value: T; };
-type ValuedOperator<T, R> = { (o: ValuedObservable<T>): ValuedObservable<R> };
-
-type AlternMapOptions = { completeWithInner?: boolean, completeWithSource?: boolean };
+import { Subscriber, ObservableInput, OperatorFunction, ObservedValueOf } from 'rxjs';
+import { innerFrom } from 'rxjs/internal/observable/innerFrom';
+import { operate } from 'rxjs/internal/util/lift';
+import { createOperatorSubscriber } from 'rxjs/internal/operators/OperatorSubscriber';
 
 /* tslint:disable:max-line-length */
-export function alternMap<T, R>(project: (value: T, index: number) => ObservableInput<R>, options?: AlternMapOptions): OperatorFunction<T, R>;
-export function alternMap<T, R>(project: (value: T, index: number) => ValuedObservable<R>, options: AlternMapOptions, valued: true): ValuedOperator<T, R>;
+export function alternMap<T, O extends ObservableInput<any>>(
+  project: (value: T, index: number) => O
+): OperatorFunction<T, ObservedValueOf<O>>;
+/** @deprecated The `resultSelector` parameter will be removed in v8. Use an inner `map` instead. Details: https://rxjs.dev/deprecations/resultSelector */
+export function alternMap<T, O extends ObservableInput<any>>(
+  project: (value: T, index: number) => O,
+  resultSelector: undefined
+): OperatorFunction<T, ObservedValueOf<O>>;
+/** @deprecated The `resultSelector` parameter will be removed in v8. Use an inner `map` instead. Details: https://rxjs.dev/deprecations/resultSelector */
+export function alternMap<T, R, O extends ObservableInput<any>>(
+  project: (value: T, index: number) => O,
+  resultSelector: (outerValue: T, innerValue: ObservedValueOf<O>, outerIndex: number, innerIndex: number) => R
+): OperatorFunction<T, R>;
+/* tslint:enable:max-line-length */
+
 /* tslint:enable:max-line-length */
 
 /**
@@ -31,96 +38,52 @@ export function alternMap<T, R>(project: (value: T, index: number) => ValuedObse
  * @method alternMap
  * @owner Observable
  */
-export function alternMap<T, R>(
-  ...args: [(value: T, index: number) => ObservableInput<R>, AlternMapOptions?, undefined?] |
-  [(value: T, index: number) => ValuedObservable<R>, AlternMapOptions, true]
-): OperatorFunction<T, R> | ValuedOperator<T, R> {
-  const [project, options] = args
-  const op = (source: Observable<T>) => source.lift(new AlternMapOperator(project, options || {}));
-  if (!args[2]) return op;
-  const p = args[0];
-  return (source: ValuedObservable<T>) => Object.defineProperty(op(source), 'value', {
-    get: () => p(source.value, -1).value
+export function alternMap<T, R, O extends ObservableInput<any>>(
+  project: (value: T, index: number) => O,
+  resultSelector?: (outerValue: T, innerValue: ObservedValueOf<O>, outerIndex: number, innerIndex: number) => R
+): OperatorFunction<T, ObservedValueOf<O> | R> {
+  return operate((source, subscriber) => {
+    let innerSubscriber: Subscriber<ObservedValueOf<O>> | null = null;
+    let index = 0;
+    // Whether or not the source subscription has completed
+    let isComplete = false;
+
+    // We only complete the result if the source is complete AND we don't have an active inner subscription.
+    // This is called both when the source completes and when the inners complete.
+    const checkComplete = () => isComplete && !innerSubscriber && subscriber.complete();
+
+    source.subscribe(
+      createOperatorSubscriber(
+        subscriber,
+        (value) => {
+          const subs = innerSubscriber
+          let innerIndex = 0;
+          const outerIndex = index++;
+          // Start the next inner subscription
+          innerFrom(project(value, outerIndex)).subscribe(
+            (innerSubscriber = createOperatorSubscriber(
+              subscriber,
+              // When we get a new inner value, next it through. Note that this is
+              // handling the deprecate result selector here. This is because with this architecture
+              // it ends up being smaller than using the map operator.
+              (innerValue) => subscriber.next(resultSelector ? resultSelector(value, innerValue, outerIndex, innerIndex++) : innerValue),
+              () => {
+                // The inner has completed. Null out the inner subscriber to
+                // free up memory and to signal that we have no inner subscription
+                // currently.
+                innerSubscriber = null!;
+                checkComplete();
+              }
+            ))
+          );
+          // Cancel the previous inner subscription if there was one
+          subs?.unsubscribe();
+        },
+        () => {
+          isComplete = true;
+          checkComplete();
+        }
+      )
+    );
   });
-}
-
-class AlternMapOperator<T, R> implements Operator<T, R> {
-  constructor(private project: (value: T, index: number) => ObservableInput<R>, private options: AlternMapOptions,) {
-  }
-
-  call(subscriber: Subscriber<R>, source: any): any {
-    return source.subscribe(new AlternMapSubscriber(subscriber, this.project, this.options));
-  }
-}
-
-/**
- * We need this JSDoc comment for affecting ESDoc.
- * @ignore
- * @extends {Ignored}
- */
-class AlternMapSubscriber<T, R> extends OuterSubscriber<T, R> {
-  private index: number = 0;
-  private innerSubscription: Subscription | null | undefined;
-
-  constructor(destination: Subscriber<R>,
-    private project: (value: T, index: number) => ObservableInput<R>,
-    private options: AlternMapOptions) {
-    super(destination);
-  }
-
-  protected _next(value: T) {
-    let result: ObservableInput<R>;
-    const index = this.index++;
-    try {
-      result = this.project(value, index);
-    } catch (error) {
-      this.destination.error!(error);
-      return;
-    }
-    this._innerSub(result, value, index);
-  }
-
-  private _innerSub(result: ObservableInput<R>, value: T, index: number) {
-    const innerSubscription = this.innerSubscription;
-    const innerSubscriber = new InnerSubscriber(this, value, index);
-    const destination = this.destination as Subscription;
-    destination.add(innerSubscriber);
-    this.innerSubscription = subscribeToResult(this, result, undefined, undefined, innerSubscriber);
-    // The returned subscription will usually be the subscriber that was
-    // passed. However, interop subscribers will be wrapped and for
-    // unsubscriptions to chain correctly, the wrapper needs to be added, too.
-    if (this.innerSubscription !== innerSubscriber) {
-      destination.add(this.innerSubscription);
-    }
-    if (innerSubscription) {
-      innerSubscription.unsubscribe();
-    }
-  }
-
-  protected _complete(): void {
-    const { innerSubscription } = this;
-    if (!innerSubscription || innerSubscription.closed || this.options.completeWithSource) {
-      super._complete();
-    }
-    this.unsubscribe();
-  }
-
-  protected _unsubscribe() {
-    this.innerSubscription = null!;
-  }
-
-  notifyComplete(innerSub: Subscription): void {
-    const destination = this.destination as Subscription;
-    destination.remove(innerSub);
-    this.innerSubscription = null!;
-    if (this.isStopped || this.options.completeWithInner) {
-      super._complete();
-    }
-  }
-
-  notifyNext(outerValue: T, innerValue: R,
-    outerIndex: number, innerIndex: number,
-    innerSub: InnerSubscriber<T, R>): void {
-    this.destination.next!(innerValue);
-  }
 }
